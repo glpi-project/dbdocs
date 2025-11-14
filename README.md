@@ -42,6 +42,13 @@ python glpi_dbdocs.py generate --sql-file path/to/glpi.sql --relation-file path/
    python glpi_dbdocs.py publish
    ```
 
+## Published links
+
+[https://dbdocs.io/glpi/GLPI-10](https://dbdocs.io/glpi/GLPI-10)
+[https://dbdocs.io/glpi/GLPI-11](https://dbdocs.io/glpi/GLPI-11)
+[https://dbdocs.io/glpi/GLPI-Main](https://dbdocs.io/glpi/GLPI-Main)
+[https://dbdocs.io/glpi/GLPI-10-to-11](https://dbdocs.io/glpi/GLPI-10-to-11)
+
 ## License
 
 GNU GPLv3+
