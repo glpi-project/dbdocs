@@ -1,0 +1,34 @@
+# Configuration example for GLPI Database Documentation Generator
+# Copy this file to config.yml and customize it
+
+# Global settings
+global:
+  output_dir: "docs"
+  default_project_name: "glpi-database"
+
+# Database sources to process
+sources:
+  - name: "glpi-main"
+    sql_file: "sql/glpi-10.0.0.sql"
+    relation_file: "relation.constant.php"
+    output_file: "glpi-main.dbml"
+    project_name: "glpi-main-database"
+    description: "GLPI 10.0.0 main database schema with relations"
+    
+  - name: "glpi-plugin-example"
+    sql_file: "sql/plugin-example.sql"
+    output_file: "plugin-example.dbml"
+    project_name: "glpi-plugin-example-database"
+    description: "Example plugin database schema"
+    
+  - name: "glpi-legacy"
+    sql_file: "sql/glpi-9.5.0.sql"
+    output_file: "glpi-legacy.dbml"
+    project_name: "glpi-legacy-database"
+    description: "GLPI 9.5.0 legacy database schema"
+
+# Publish settings
+publish:
+  enabled: true
+  dbdocs_cli: "dbdocs"
+  auto_publish: false  # Set to true to automatically publish after generation
