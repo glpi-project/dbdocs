@@ -1,0 +1,152 @@
+name: Publish GLPI Database Documentation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  publish-dbdocs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dbdocs repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dbdocs CLI
+        run: sudo npm install -g dbdocs
+
+      - name: Verify dbdocs installation
+        run: dbdocs --version
+
+      - name: Clone GLPI repository
+        run: |
+          git clone https://github.com/glpi-project/glpi.git /tmp/glpi
+          cd /tmp/glpi
+          echo "GLPI repository cloned"
+
+      - name: Checkout GLPI 10.0/bugfixes
+        run: |
+          cd /tmp/glpi
+          git checkout 10.0/bugfixes
+          echo "Checked out 10.0/bugfixes branch"
+
+      - name: Generate GLPI 10 schema
+        run: |
+          python glpi_dbdocs.py generate \
+            --sql-file /tmp/glpi/install/mysql/glpi-empty.sql \
+            --relation-file /tmp/glpi/inc/relation.constant.php \
+            --output docs \
+            --output-file glpi-10.dbml
+
+      - name: Checkout GLPI 11.0/bugfixes
+        run: |
+          cd /tmp/glpi
+          git checkout 11.0/bugfixes
+          echo "Checked out 11.0/bugfixes branch"
+
+      - name: Generate GLPI 11 schema
+        run: |
+          python glpi_dbdocs.py generate \
+            --sql-file /tmp/glpi/install/mysql/glpi-empty.sql \
+            --relation-file /tmp/glpi/inc/relation.constant.php \
+            --output docs \
+            --output-file glpi-11.dbml
+
+      - name: Checkout GLPI main
+        run: |
+          cd /tmp/glpi
+          git checkout main
+          echo "Checked out main branch"
+
+      - name: Generate GLPI Main schema
+        run: |
+          python glpi_dbdocs.py generate \
+            --sql-file /tmp/glpi/install/mysql/glpi-empty.sql \
+            --relation-file /tmp/glpi/inc/relation.constant.php \
+            --output docs \
+            --output-file glpi-main.dbml
+
+      - name: Remove existing dbdocs projects
+        if: github.event_name != 'pull_request'
+        env:
+          DBDOCS_TOKEN: ${{ secrets.DBDOCS_TOKEN }}
+        run: |
+          dbdocs remove "GLPI 11" || true
+          dbdocs remove "GLPI 10" || true
+          dbdocs remove "GLPI Main" || true
+          dbdocs remove "GLPI 10 to 11" || true
+          echo "Removed existing projects (if any)"
+
+      - name: Publish GLPI 11 schema
+        if: github.event_name != 'pull_request'
+        env:
+          DBDOCS_TOKEN: ${{ secrets.DBDOCS_TOKEN }}
+        run: |
+          dbdocs build docs/glpi-11.dbml --project "GLPI 11"
+          echo "Published GLPI 11 schema"
+
+      - name: Publish GLPI 10 schema
+        if: github.event_name != 'pull_request'
+        env:
+          DBDOCS_TOKEN: ${{ secrets.DBDOCS_TOKEN }}
+        run: |
+          dbdocs build docs/glpi-10.dbml --project "GLPI 10"
+          echo "Published GLPI 10 schema"
+
+      - name: Publish GLPI Main schema
+        if: github.event_name != 'pull_request'
+        env:
+          DBDOCS_TOKEN: ${{ secrets.DBDOCS_TOKEN }}
+        run: |
+          dbdocs build docs/glpi-main.dbml --project "GLPI Main"
+          echo "Published GLPI Main schema"
+
+      - name: Publish GLPI 10 to 11 diff schema
+        if: github.event_name != 'pull_request'
+        env:
+          DBDOCS_TOKEN: ${{ secrets.DBDOCS_TOKEN }}
+        run: |
+          dbdocs build docs/glpi-10.dbml --project "GLPI 10 to 11"
+          dbdocs build docs/glpi-11.dbml --project "GLPI 10 to 11"
+          echo "Published GLPI 10 to 11 diff schema"
+
+      - name: Upload generated DBML files as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: glpi-dbml-schemas
+          path: docs/*.dbml
+          retention-days: 30
+
+      - name: Summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "## Publication Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The following GLPI database schemas have been published to dbdocs.io:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **GLPI 10** (from 10.0/bugfixes branch)" >> $GITHUB_STEP_SUMMARY
+          echo "- **GLPI 11** (from 11.0/bugfixes branch)" >> $GITHUB_STEP_SUMMARY
+          echo "- **GLPI Main** (from main branch)" >> $GITHUB_STEP_SUMMARY
+          echo "- **GLPI 10 to 11** (comparison view)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Generated DBML files are available as build artifacts." >> $GITHUB_STEP_SUMMARY
