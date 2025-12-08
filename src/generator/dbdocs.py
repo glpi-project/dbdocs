@@ -22,6 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import re
 import click
 
 
@@ -73,19 +74,22 @@ class DBDocsGenerator:
 
         dbml_content = ["// Relationships", ""]
 
-        # Filter relations to only include those where both source and target
-        # tables exist
-        valid_relations = []
-        for relation in self.relations:
-            source_table = relation['source_table']
-            target_table = relation['target_table']
+        # Keep only relations where both endpoint tables exist.
+        valid_relations = [
+            r for r in self.relations
+            if self._table_exists(r.get('source_table', ''))
+            and self._table_exists(r.get('target_table', ''))
+        ]
 
-            # Check if tables exist, handling the "_" prefix convention
-            source_exists = self._table_exists(source_table)
-            target_exists = self._table_exists(target_table)
+        # Add inferred simple relations discovered from column names.
+        inferred = self._infer_relations_from_columns(valid_relations)
+        if inferred:
+            valid_relations.extend(inferred)
 
-            if source_exists and target_exists:
-                valid_relations.append(relation)
+        # Sort relations by normalized source table name, then target table,
+        # then by source column(s) to produce a stable, grouped ordering in
+        # the generated DBML file.
+        valid_relations.sort(key=self._relation_sort_key)
 
         for relation in valid_relations:
             relation_line = self._format_relation(relation)
@@ -260,6 +264,66 @@ class DBDocsGenerator:
             f'// Unknown relation format: {source_table_normalized} -> '
             f'{target_table_normalized}'
         )
+
+    def _relation_sort_key(self, rel: Dict):
+        """Sorting key for relations: source, target, source columns."""
+        src = self._get_normalized_table_name(rel.get('source_table', ''))
+        tgt = self._get_normalized_table_name(rel.get('target_table', ''))
+        if 'source_column' in rel:
+            sc = rel.get('source_column') or ''
+        else:
+            sc = ','.join(rel.get('source_columns', []) or [])
+        return (src.lower(), tgt.lower(), sc)
+
+    def _infer_relations_from_columns(self, existing_relations: List[Dict]) -> List[Dict]:
+        """Infer simple FK relations from table column names.
+
+        Scans `self.tables` for columns matching `<base>_id` or
+        `<base>_id_*` and, when a candidate referenced table exists,
+        yields a simple relation if not already present in
+        `existing_relations`.
+        """
+        existing_single = set()
+        for rel in existing_relations:
+            if 'source_column' in rel:
+                src_norm = self._get_normalized_table_name(rel['source_table'])
+                existing_single.add((src_norm, rel['source_column']))
+
+        inferred = []
+        for table_name, table_info in self.tables.items():
+            src_norm = self._get_normalized_table_name(table_name)
+            for col in table_info.get('columns', []):
+                col_name = col.get('name')
+                if not col_name:
+                    continue
+
+                m = re.match(r"^([A-Za-z0-9_]+)_id(?:_.*)?$", col_name)
+                if not m:
+                    continue
+
+                base = m.group(1)
+                candidates = [f"glpi_{base}", base]
+                ref_table = None
+                for cand in candidates:
+                    if self._table_exists(cand):
+                        ref_table = self._get_normalized_table_name(cand)
+                        break
+
+                if not ref_table:
+                    continue
+
+                if (src_norm, col_name) in existing_single:
+                    continue
+
+                inferred.append({
+                    'source_table': table_name,
+                    'target_table': ref_table,
+                    'source_column': col_name,
+                    'target_column': 'id',
+                    'relation_type': '1:n',
+                })
+
+        return inferred
 
     def save_dbdocs_file(self, output_path: str):
         """Save dbdocs configuration to file."""

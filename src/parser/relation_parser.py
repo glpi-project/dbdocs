@@ -77,29 +77,43 @@ class RelationParser:
         """
         relations = {}
 
-        # Split by table entries (looking for 'table_name' => [)
-        table_entries = re.findall(
-            r"'([^']+)'\s*=>\s*\[(.*?)(?=\n\s*'[^']+'\s*=>\s*\[|\n\s*\],?\s*$)",
-            content,
-            re.DOTALL
-        )
+        # Find all top-level keys in the array
+        key_iter = re.finditer(r"'([^']+)'\s*=>\s*\[", content)
+        for m in key_iter:
+            key_name = m.group(1)
 
-        for table_name, table_relations in table_entries:
-            relations[table_name] = self._parse_table_relations(
+            # Check nesting level to ensure it's a top-level array
+            prefix = content[:m.start()]
+            nesting = prefix.count('[') - prefix.count(']')
+            if nesting != 0:
+                # This is an inner array (nested). Skip it for top-level
+                # table extraction.
+                continue
+
+            # Find matching closing bracket for this '[' starting at m.end()-1
+            start_idx = content.find('[', m.start())
+            if start_idx == -1:
+                continue
+
+            depth = 0
+            end_idx = None
+            for i in range(start_idx, len(content)):
+                ch = content[i]
+                if ch == '[':
+                    depth += 1
+                elif ch == ']':
+                    depth -= 1
+                    if depth == 0:
+                        end_idx = i
+                        break
+
+            if end_idx is None:
+                # Unbalanced brackets — skip this key
+                continue
+
+            table_relations = content[start_idx + 1:end_idx]
+            relations[key_name] = self._parse_table_relations(
                 table_relations)
-
-        # If no matches found, try a simpler approach
-        if not table_entries:
-            # Look for individual table entries
-            table_entries = re.findall(
-                r"'([^']+)'\s*=>\s*\[(.*?)\],",
-                content,
-                re.DOTALL
-            )
-
-            for table_name, table_relations in table_entries:
-                relations[table_name] = self._parse_table_relations(
-                    table_relations)
 
         return relations
 
@@ -196,26 +210,30 @@ class RelationParser:
                     continue
 
                 # For simple foreign key relations, create DBML ref
-                # The target table is the one with the foreign key, source is
-                # the referenced table (corrected logic)
+                # We want the DBML `Ref` to have the table containing the
+                # foreign key on the left and the referenced table (usually
+                # with primary key `id`) on the right. In our parsed structure
+                # `source_table` is the outer key from the PHP array (the
+                # referenced table) and `target_table` is the inner key (the
+                # table that contains the foreign key columns). To produce
+                # DBML like `appliances.users_id > users.id` we set the
+                # left-hand side (source_table) to the table with the FK.
                 if len(foreign_keys) == 1:
                     dbml_relations.append({
-                        'source_table': source_table,  # Referenced table
-                        'target_table': target_table,  # Table with foreign key
-                        'source_column': 'id',  # Primary key of referenced table
-                        'target_column': foreign_keys[0],  # Foreign key column
+                        'source_table': target_table,  # Table with foreign key
+                        'target_table': source_table,  # Referenced table
+                        'source_column': foreign_keys[0],  # Foreign key column
+                        'target_column': 'id',  # PK of referenced table
                         'relation_type': '1:n'  # One-to-many relationship
                     })
                 elif len(foreign_keys) == 2:
-                    # Handle composite foreign keys (like many-to-many relations)
-                    # This is a simplified approach - in reality, these might
-                    # be more complex
+                    # Handle composite foreign keys (simplified)
                     dbml_relations.append({
-                        'source_table': source_table,  # Referenced table
-                        'target_table': target_table,  # Table with foreign keys
-                        # Assuming both point to id columns
-                        'source_columns': ['id', 'id'],
-                        'target_columns': foreign_keys,  # Foreign key columns
+                        'source_table': target_table,  # Table with foreign keys
+                        'target_table': source_table,  # Referenced table
+                        # Assuming both reference id on referenced table
+                        'source_columns': foreign_keys,  # Foreign key columns
+                        'target_columns': ['id', 'id'],
                         'relation_type': 'm:n'
                     })
 
