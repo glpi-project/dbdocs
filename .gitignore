@@ -4,3 +4,4 @@ venv/
 docs/
 config.yml
 samples/
+website/dist/
