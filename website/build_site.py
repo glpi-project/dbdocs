@@ -13,11 +13,24 @@ DIST = ROOT / 'dist'
 
 
 def load_links():
+    """Load and return links from `src/links.json` as a Python object.
+
+    Returns:
+        list|dict: Parsed JSON content from `links.json`.
+    """
     path = SRC / 'links.json'
     return json.loads(path.read_text(encoding='utf-8'))
 
 
 def build_index(links):
+    """Render the index HTML from a template and a list of link entries.
+
+    Args:
+        links (list): Sequence of mapping objects containing link metadata.
+
+    Returns:
+        str: Rendered HTML for the index page.
+    """
     tpl = (SRC / 'index.template.html').read_text(encoding='utf-8')
     items = []
     for l in links:
@@ -35,6 +48,11 @@ def build_index(links):
 
 
 def copy_assets():
+    """Copy static assets and stylesheet from `src` into the `dist` folder.
+
+    Ensures `dist` exists, copies `styles.css`, and copies the `assets`
+    directory (replacing any existing one).
+    """
     DIST.mkdir(parents=True, exist_ok=True)
     # copy styles (overwrite or create)
     styles_src = SRC / 'styles.css'
@@ -51,11 +69,17 @@ def copy_assets():
 
 
 def write_index(html):
+    """Write the generated index HTML to `dist/index.html`.
+
+    Args:
+        html (str): HTML content to write.
+    """
     DIST.mkdir(parents=True, exist_ok=True)
     (DIST / 'index.html').write_text(html, encoding='utf-8')
 
 
 def main():
+    """Main entry point: build the website into the `dist` directory."""
     links = load_links()
     html = build_index(links)
     copy_assets()
