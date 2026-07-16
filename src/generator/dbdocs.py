@@ -153,10 +153,11 @@ class DBDocsGenerator:
 
     def _format_index(self, index: Dict) -> str:
         """Format an index definition for DBML."""
-        if len(index["columns"]) > 1:
-            columns_str = f'({", ".join(index["columns"])})'
+        quoted_columns = [f'"{col}"' for col in index["columns"]]
+        if len(quoted_columns) > 1:
+            columns_str = f'({", ".join(quoted_columns)})'
         else:
-            columns_str = index["columns"][0]
+            columns_str = quoted_columns[0]
 
         if index["type"] == "UNIQUE":
             return f'{columns_str} [unique, name: "{index["name"]}"]'

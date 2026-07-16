@@ -308,6 +308,8 @@ class GLPIDatabaseParser:
             clean_col = re.sub(
                 r"([a-zA-Z_][a-zA-Z0-9_]*)\([^)]*\)", r"\1", clean_col
             )
+            # Remove DESC or ASC modifiers
+            clean_col = re.sub(r"\s+(DESC|ASC)\s*$", "", clean_col, flags=re.IGNORECASE)
             clean_col = clean_col.strip('`" ')
             if clean_col:
                 clean_columns.append(clean_col)
