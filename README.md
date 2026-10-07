@@ -46,8 +46,10 @@ python glpi_dbdocs.py generate --sql-file path/to/glpi.sql --relation-file path/
 
 - [https://dbdocs.io/glpi/GLPI-10](https://dbdocs.io/glpi/GLPI-10)
 - [https://dbdocs.io/glpi/GLPI-11](https://dbdocs.io/glpi/GLPI-11)
+- [https://dbdocs.io/glpi/GLPI-12](https://dbdocs.io/glpi/GLPI-12)
 - [https://dbdocs.io/glpi/GLPI-Main](https://dbdocs.io/glpi/GLPI-Main)
 - [https://dbdocs.io/glpi/GLPI-10-to-11](https://dbdocs.io/glpi/GLPI-10-to-11)
+- [https://dbdocs.io/glpi/GLPI-11-to-12](https://dbdocs.io/glpi/GLPI-11-to-12)
 
 ## License
 
