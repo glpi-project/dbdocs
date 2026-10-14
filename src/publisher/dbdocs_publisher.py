@@ -55,7 +55,8 @@ class DBDocsPublisher:
             # Build the dbdocs command
             cmd = [
                 self.dbdocs_cli, "build", str(dbml_path),
-                "--project", project_name
+                "--project", project_name,
+                "--public"
             ]
 
             # Execute the command
