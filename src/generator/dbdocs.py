@@ -3,7 +3,7 @@ DBDocs Generator for GLPI Database Documentation Generator.
 
 This module contains the DBDocsGenerator class for generating dbdocs-compatible DBML documentation.
 
-Copyright (C) 2025 TECLIB/GLPI (glpi-project.org)
+Copyright (C) 2025-2026 TECLIB/GLPI (glpi-project.org)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,9 +29,52 @@ import click
 class DBDocsGenerator:
     """Generator for dbdocs-compatible DBML documentation."""
 
-    def __init__(self, tables: Dict, relations: Optional[List[Dict]] = None):
+    def __init__(self, tables: Dict, relations: Optional[List[Dict]] = None,
+                 source: Optional[Dict] = None):
         self.tables = tables
         self.relations = relations or []
+        # Git information about the schema source (branch, commit, url)
+        self.source = source or {}
+
+    def _generate_project_definition(self) -> List[str]:
+        """Generate project definition lines for DBML.
+
+        The project note is displayed on the dbdocs.io project overview page.
+        """
+        note_lines = [
+            "GLPI database schema, automatically generated from the "
+            "[GLPI](https://github.com/glpi-project/glpi) source code.",
+            "",
+        ]
+
+        branch = self.source.get("branch")
+        commit = self.source.get("commit")
+        if branch:
+            note_lines.append(f"- Branch: `{branch}`")
+        if commit:
+            commit_ref = f"`{commit[:10]}`"
+            if self.source.get("url"):
+                commit_ref = f"[{commit_ref}]({self.source['url']}/commit/{commit})"
+            note_lines.append(f"- Commit: {commit_ref}")
+        if branch or commit:
+            note_lines.append("")
+
+        note_lines.extend([
+            "Automatically generated diagrams; they may contain errors. "
+            "If you notice a problem, please contribute on "
+            "[GitHub](https://github.com/glpi-project/dbdocs).",
+            "",
+            "Licensed under the GNU GPLv3+, like GLPI.",
+        ])
+
+        project_lines = [
+            'Project "GLPI" {',
+            "  database_type: 'MySQL'",
+            "  Note: '''",
+        ]
+        project_lines.extend(f"  {line}".rstrip() for line in note_lines)
+        project_lines.extend(["  '''", "}", ""])
+        return project_lines
 
     def _generate_table_definition(
             self, table_name: str, table_info: Dict) -> List[str]:
@@ -100,7 +143,7 @@ class DBDocsGenerator:
 
     def generate_dbdocs_dbml(self) -> str:
         """Generate dbdocs DBML configuration."""
-        dbml_content = []
+        dbml_content = self._generate_project_definition()
 
         # Generate table definitions
         for table_name, table_info in self.tables.items():

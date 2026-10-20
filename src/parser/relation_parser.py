@@ -4,7 +4,7 @@ Relation Parser for GLPI Database Documentation Generator.
 This module contains the RelationParser class for parsing GLPI relation constants
 and converting them to DBML relationship definitions.
 
-Copyright (C) 2025 TECLIB/GLPI (glpi-project.org)
+Copyright (C) 2025-2026 TECLIB/GLPI (glpi-project.org)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

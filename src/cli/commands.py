@@ -3,7 +3,7 @@ CLI Commands for GLPI Database Documentation Generator.
 
 This module contains the Click command-line interface for the GLPI database documentation tool.
 
-Copyright (C) 2025 TECLIB/GLPI (glpi-project.org)
+Copyright (C) 2025-2026 TECLIB/GLPI (glpi-project.org)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import subprocess
 from pathlib import Path
+from typing import Dict
 
 import click
 
@@ -27,6 +29,41 @@ from ..parser import GLPIDatabaseParser, RelationParser
 from ..generator import DBDocsGenerator
 from ..config import ConfigManager
 from ..publisher import DBDocsPublisher
+
+
+def _git(repo_dir: Path, *args: str) -> str:
+    """Run a git command in repo_dir and return its output ("" on failure)."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_dir), *args],
+            capture_output=True, text=True, check=True
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+    return result.stdout.strip()
+
+
+def _detect_git_source(sql_file: str) -> Dict:
+    """Detect branch, commit and web URL of the git repository holding sql_file."""
+    repo_dir = Path(sql_file).resolve().parent
+    source = {}
+
+    commit = _git(repo_dir, "rev-parse", "HEAD")
+    if not commit:
+        return source
+    source["commit"] = commit
+
+    branch = _git(repo_dir, "rev-parse", "--abbrev-ref", "HEAD")
+    if branch and branch != "HEAD":
+        source["branch"] = branch
+
+    remote_url = _git(repo_dir, "remote", "get-url", "origin")
+    if remote_url.startswith("https://github.com/"):
+        if remote_url.endswith(".git"):
+            remote_url = remote_url[:-len(".git")]
+        source["url"] = remote_url
+
+    return source
 
 
 @click.group()
@@ -81,7 +118,8 @@ def generate(sql_file: str, relation_file: str, output: str, output_file: str):
 
         # Generate dbdocs documentation
         click.echo("Generating dbdocs documentation...")
-        generator = DBDocsGenerator(tables, relations)
+        generator = DBDocsGenerator(
+            tables, relations, _detect_git_source(sql_file))
 
         if output_file:
             # Save to specific file
@@ -168,7 +206,8 @@ def _process_single_source(source_config, output_dir):
     relations = _parse_relations(config["relation_file"])
 
     # Generate and save DBML
-    generator = DBDocsGenerator(tables, relations)
+    generator = DBDocsGenerator(
+        tables, relations, _detect_git_source(config["sql_file"]))
     dbml_content = generator.generate_dbdocs_dbml()
 
     output_path = Path(output_dir) / config["output_file"]
