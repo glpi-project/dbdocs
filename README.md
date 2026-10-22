@@ -5,6 +5,7 @@ Generate and publish GLPI database schema documentation to dbdocs.io.
 ## Installation
 
 ```bash
+git clone https://github.com/glpi-project/dbdocs.git
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
